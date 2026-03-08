@@ -1,8 +1,8 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
 const uri = process.env.MONGODB_URI;
 const options = {
-  maxPoolSize: 1, // Smaller pool for serverless
+  maxPoolSize: 1,
   minPoolSize: 0,
   maxIdleTimeMS: 10000,
   serverSelectionTimeoutMS: 5000,
@@ -18,11 +18,22 @@ if (!uri) {
   throw new Error('Please define MONGODB_URI environment variable');
 }
 
-// In serverless environments, we need to cache the connection
-let cached = global.mongo;
+// Define the cached connection type
+interface CachedConnection {
+  conn: { client: MongoClient; db: Db } | null;
+  promise: Promise<{ client: MongoClient; db: Db }> | null;
+}
 
-if (!cached) {
-  cached = global.mongo = { conn: null, promise: null };
+// Extend global type
+declare global {
+  var mongo: CachedConnection | undefined;
+}
+
+// Initialize cache
+let cached: CachedConnection = global.mongo || { conn: null, promise: null };
+
+if (!global.mongo) {
+  global.mongo = cached;
 }
 
 export async function connectToDatabase() {
@@ -35,7 +46,10 @@ export async function connectToDatabase() {
     cached.promise = client.connect()
       .then(client => {
         console.log('✅ MongoDB connected successfully');
-        return { client, db: client.db('donations') };
+        return {
+          client,
+          db: client.db('donations')
+        };
       })
       .catch(err => {
         console.error('❌ MongoDB connection error:', err);
@@ -48,7 +62,6 @@ export async function connectToDatabase() {
   return cached.conn;
 }
 
-// Export a function that returns the db directly
 export async function getDb() {
   const { db } = await connectToDatabase();
   return db;
