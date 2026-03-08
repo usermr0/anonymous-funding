@@ -1,4 +1,4 @@
-import { MongoClient, Db } from 'mongodb';
+import { MongoClient } from 'mongodb';
 
 const uri = process.env.MONGODB_URI;
 const options = {
@@ -14,27 +14,11 @@ const options = {
   family: 4
 };
 
-// Check if URI exists and throw error if not
 if (!uri) {
   throw new Error('Please define MONGODB_URI environment variable');
 }
 
-// Now TypeScript knows uri is definitely a string
-const MONGODB_URI: string = uri;
-
-// Define the cached connection type
-interface CachedConnection {
-  conn: { client: MongoClient; db: Db } | null;
-  promise: Promise<{ client: MongoClient; db: Db }> | null;
-}
-
-// Extend global type
-declare global {
-  var mongo: CachedConnection | undefined;
-}
-
-// Initialize cache
-let cached: CachedConnection = global.mongo || { conn: null, promise: null };
+let cached = global.mongo || { conn: null, promise: null };
 
 if (!global.mongo) {
   global.mongo = cached;
@@ -46,8 +30,7 @@ export async function connectToDatabase() {
   }
 
   if (!cached.promise) {
-    // Use MONGODB_URI which is guaranteed to be a string
-    const client = new MongoClient(MONGODB_URI, options);
+    const client = new MongoClient(uri, options);
     cached.promise = client.connect()
       .then(client => {
         console.log('✅ MongoDB connected successfully');
