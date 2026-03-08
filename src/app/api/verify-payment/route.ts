@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function POST(req: NextRequest) {
@@ -13,8 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db('donations');
+    const db = await getDb();
 
     // Update the donor as verified
     const result = await db.collection('donors').updateOne(

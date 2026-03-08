@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
@@ -29,8 +29,7 @@ export async function POST(req) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db('donations');
+    const db = await getDb();
 
     const result = await db.collection('donors').updateOne(
       { _id: new ObjectId(donorId) },
