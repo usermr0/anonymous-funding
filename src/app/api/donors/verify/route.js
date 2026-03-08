@@ -8,16 +8,13 @@ export async function POST(req) {
   try {
     const { donorId, token } = await req.json();
 
-    // Check if ADMIN_TOKEN is configured
     if (!ADMIN_TOKEN) {
-      console.error('ADMIN_TOKEN environment variable is not set');
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
       );
     }
 
-    // Verify the token
     if (token !== ADMIN_TOKEN) {
       return NextResponse.json(
         { error: 'Unauthorized' },
