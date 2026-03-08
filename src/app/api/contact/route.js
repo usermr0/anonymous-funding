@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import freelyEmail from 'freely-email';
 
 export async function POST(req) {
   try {
@@ -13,7 +12,7 @@ export async function POST(req) {
       );
     }
 
-    // Basic email validation
+    // Simple email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json(
@@ -22,37 +21,19 @@ export async function POST(req) {
       );
     }
 
-    // Send email using FreelyEmail - completely anonymous!
-    const emailData = {
-      recipient: "[user9mrzero@gmail.com]", // Replace with YOUR email where you want to receive messages
-      app: "Mr Zero's Portfolio",
-      replyTo: email, // So you can reply directly to the sender
-      subject: `🔔 New Message from ${name} via Portfolio`,
-      sender: "MrZero-Portfolio", // This becomes [email protected]
-      message: `
-================================
-NEW CONTACT FORM SUBMISSION
-================================
+    // Log the message (you'll see this in Vercel logs)
+    console.log('========== NEW CONTACT FORM ==========');
+    console.log('Name:', name);
+    console.log('Email:', email);
+    console.log('Message:', message);
+    console.log('Time:', new Date().toISOString());
+    console.log('======================================');
 
-Name: ${name}
-Email: ${email}
-Time: ${new Date().toLocaleString()}
-
-Message:
-${message}
-
-================================
-You can reply directly to: ${email}
-================================
-      `,
-    };
-
-    const result = await freelyEmail.sendEmail(emailData);
-    console.log('Email sent successfully:', result);
-
+    // For now, just return success
+    // You can add email sending later with a service like SendGrid
     return NextResponse.json({
       success: true,
-      message: 'Message sent successfully!'
+      message: 'Message received! I\'ll get back to you soon.'
     });
 
   } catch (error) {

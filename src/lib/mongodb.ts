@@ -1,59 +1,46 @@
-// Load environment variables FIRST - before anything else
-import * as dotenv from 'dotenv';
-import * as path from 'path';
+import { NextResponse } from 'next/server';
 
-// Force load .env file from the correct path
-const result = dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-console.log('🔍 Dotenv loaded:', !result.error);
-console.log('🔍 MONGODB_URI exists:', !!process.env.MONGODB_URI);
+export async function POST(req) {
+  try {
+    const { name, email, message } = await req.json();
 
-import { MongoClient } from 'mongodb';
+    // Validation
+    if (!name || !email || !message) {
+      return NextResponse.json(
+        { error: 'All fields are required' },
+        { status: 400 }
+      );
+    }
 
-const uri = process.env.MONGODB_URI;
-console.log('🔍 Using URI starting with:', uri ? uri.substring(0, 50) + '...' : 'UNDEFINED');
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid email address' },
+        { status: 400 }
+      );
+    }
 
-const options = {
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 60000,
-  connectTimeoutMS: 10000,
-  tls: true,
-  retryWrites: true,
-  retryReads: true,
-  family: 4 // Force IPv4
-};
+    // Log the message (you'll see this in Vercel logs)
+    console.log('========== NEW CONTACT FORM ==========');
+    console.log('Name:', name);
+    console.log('Email:', email);
+    console.log('Message:', message);
+    console.log('Time:', new Date().toISOString());
+    console.log('======================================');
 
-declare global {
-  var _mongoClientPromise: Promise<MongoClient> | undefined;
-}
-
-if (!uri) {
-  throw new Error('❌ Please define MONGODB_URI environment variable');
-}
-
-let clientPromise: Promise<MongoClient>;
-
-const connectWithRetry = () => {
-  console.log('⏳ Attempting to connect to MongoDB...');
-  const client = new MongoClient(uri, options);
-  return client.connect()
-    .then(client => {
-      console.log('✅ MongoDB connected successfully');
-      return client;
-    })
-    .catch(err => {
-      console.error('❌ MongoDB connection error:', err.message);
-      throw err;
+    // For now, just return success
+    // You can add email sending later with a service like SendGrid
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Message received! I\'ll get back to you soon.' 
     });
-};
-
-if (process.env.NODE_ENV === 'development') {
-  if (!global._mongoClientPromise) {
-    global._mongoClientPromise = connectWithRetry();
+    
+  } catch (error) {
+    console.error('Contact form error:', error);
+    return NextResponse.json(
+      { error: 'Failed to send message. Please try again.' },
+      { status: 500 }
+    );
   }
-  clientPromise = global._mongoClientPromise;
-} else {
-  clientPromise = connectWithRetry();
 }
-
-export default clientPromise;
