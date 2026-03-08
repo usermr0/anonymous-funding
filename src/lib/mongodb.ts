@@ -14,9 +14,13 @@ const options = {
   family: 4
 };
 
+// Check if URI exists and throw error if not
 if (!uri) {
   throw new Error('Please define MONGODB_URI environment variable');
 }
+
+// Now TypeScript knows uri is definitely a string
+const MONGODB_URI: string = uri;
 
 // Define the cached connection type
 interface CachedConnection {
@@ -42,7 +46,8 @@ export async function connectToDatabase() {
   }
 
   if (!cached.promise) {
-    const client = new MongoClient(uri, options);
+    // Use MONGODB_URI which is guaranteed to be a string
+    const client = new MongoClient(MONGODB_URI, options);
     cached.promise = client.connect()
       .then(client => {
         console.log('✅ MongoDB connected successfully');
