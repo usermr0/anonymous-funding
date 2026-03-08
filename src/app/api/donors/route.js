@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
 
 export async function GET() {
   try {
-    const client = await clientPromise;
-    const db = client.db('donations');
+    const db = await getDb();
 
     const donors = await db
       .collection('donors')
@@ -30,16 +29,7 @@ export async function GET() {
 export async function POST(req) {
   try {
     const { name, phone, amount, transactionId } = await req.json();
-
-    if (!name || !amount || !transactionId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    const client = await clientPromise;
-    const db = client.db('donations');
+    const db = await getDb();
 
     const result = await db.collection('donors').insertOne({
       name,
