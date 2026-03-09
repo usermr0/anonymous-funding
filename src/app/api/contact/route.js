@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/mongodb';
 
 export async function POST(req) {
   try {
@@ -11,13 +12,19 @@ export async function POST(req) {
       );
     }
 
-    // Log the message (you'll see this in Vercel logs)
-    console.log('========== NEW CONTACT FORM ==========');
-    console.log('Name:', name);
-    console.log('Email:', email);
-    console.log('Message:', message);
-    console.log('Time:', new Date().toISOString());
-    console.log('======================================');
+    // Get database connection
+    const db = await getDb();
+
+    // Insert message into 'messages' collection
+    const result = await db.collection('messages').insertOne({
+      name,
+      email,
+      message,
+      createdAt: new Date(),
+      read: false, // optional, to mark as unread
+    });
+
+    console.log('✅ Message saved to database with ID:', result.insertedId);
 
     return NextResponse.json({
       success: true,
