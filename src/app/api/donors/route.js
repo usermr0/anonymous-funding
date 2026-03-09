@@ -28,20 +28,19 @@ export async function GET() {
   }
 }
 
-// POST: Save a new donation (updated for Razorpay)
+// POST: Save a new donation (updated – no email required)
 export async function POST(req) {
   try {
     const {
       name,
       phone,
-      email,
       amount,
       transactionId,
       razorpay_order_id,
       razorpay_signature
     } = await req.json();
 
-    // Validate required fields
+    // Validate only the fields we need
     if (!name || !amount || !transactionId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -55,7 +54,6 @@ export async function POST(req) {
     const result = await db.collection('donors').insertOne({
       name,
       phone: phone || null,
-      email: email || null,
       amount: Number(amount),
       transactionId,                // Razorpay payment ID
       razorpay_order_id,             // Razorpay order ID

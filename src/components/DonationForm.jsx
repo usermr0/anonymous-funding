@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 export default function DonationForm({ onDonationSubmitted, businessName }) {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [customAmount, setCustomAmount] = useState('');
@@ -30,7 +29,7 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
     e.preventDefault();
 
     const donationAmount = parseInt(amount || customAmount);
-    if (!donationAmount || !name || !email) {
+    if (!donationAmount || !name) {
       alert('Please fill all required fields');
       return;
     }
@@ -62,14 +61,14 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
         description: 'Donation',
         order_id: order.id,
         handler: async function(response) {
-          // 4. Save donation to MongoDB
+          // 4. Save donation to MongoDB (email omitted)
           const saveRes = await fetch('/api/donors', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name,
               phone: phone || null,
-              email,
+              // email is intentionally not sent
               amount: donationAmount,
               transactionId: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
@@ -81,7 +80,6 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
             onDonationSubmitted();
             // Reset form
             setName('');
-            setEmail('');
             setPhone('');
             setAmount('');
             setCustomAmount('');
@@ -90,8 +88,8 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
         },
         prefill: {
           name,
-          email,
           contact: phone
+          // email removed from prefill
         },
         theme: { color: '#1f2937' }
       };
@@ -121,21 +119,6 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter your name"
-            required
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-400"
-          />
-        </div>
-
-        {/* Email Input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
             required
             className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
@@ -188,7 +171,7 @@ export default function DonationForm({ onDonationSubmitted, businessName }) {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isProcessing || !name || !email || (!amount && !customAmount)}
+          disabled={isProcessing || !name || (!amount && !customAmount)}
           className="w-full py-4 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400"
         >
           {isProcessing ? 'Processing...' : 'Donate with UPI / Cards'}
