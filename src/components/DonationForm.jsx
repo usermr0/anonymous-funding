@@ -1,34 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Smartphone, Loader } from 'lucide-react';
 
-// Simple functions instead of importing from lib
-const generateTransactionId = () => {
-  return 'TXN' + Date.now() + Math.random().toString(36).substring(7).toUpperCase();
-};
-
-const createUPILink = (upiId, name, amount, transactionId) => {
-  const params = new URLSearchParams({
-    pa: upiId,
-    pn: name,
-    am: amount.toString(),
-    cu: 'INR',
-    tn: transactionId,
-  });
-
-  return `upi://pay?${params.toString()}`;
-};
-
-export default function DonationForm({ onDonationSubmitted, upiId, businessName }) {
+export default function DonationForm({ onDonationSubmitted, businessName }) {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [showVerification, setShowVerification] = useState(false);
 
   const presetAmounts = [500, 1000, 2500, 5000];
 
@@ -37,104 +17,104 @@ export default function DonationForm({ onDonationSubmitted, upiId, businessName 
     setCustomAmount('');
   };
 
-  const handleCustomAmount = (e) => {
-    setCustomAmount(e.target.value);
-    setAmount('');
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = resolve;
+      document.body.appendChild(script);
+    });
   };
 
-  const handlePayNow = async () => {
-    const donationAmount = parseInt(amount || customAmount);
-    if (!donationAmount || donationAmount <= 0) {
-      setError('Please select an amount first');
-      return;
-    }
+  const handlePayment = async (e) => {
+    e.preventDefault();
 
-    if (!name) {
-      setError('Please enter your name');
+    const donationAmount = parseInt(amount || customAmount);
+    if (!donationAmount || !name || !email) {
+      alert('Please fill all required fields');
       return;
     }
 
     setIsProcessing(true);
-    setError('');
 
     try {
-      const transactionId = generateTransactionId();
-
-      // Save pending donation
-      const saveResponse = await fetch('/api/donors', {
+      // 1. Create order on your backend
+      const orderRes = await fetch('/api/create-razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          phone: phone || undefined,
-          amount: donationAmount,
-          transactionId,
-        }),
+        body: JSON.stringify({ amount: donationAmount })
       });
+      const order = await orderRes.json();
 
-      if (!saveResponse.ok) {
-        throw new Error('Failed to save donation record');
+      if (!order.id) {
+        throw new Error('Failed to create order');
       }
 
-      setShowVerification(true);
+      // 2. Load Razorpay script
+      await loadRazorpayScript();
 
-      // Open UPI app
-      const upiLink = createUPILink(upiId, businessName, donationAmount, transactionId);
-      window.location.href = upiLink;
+      // 3. Open Razorpay checkout
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: businessName,
+        description: 'Donation',
+        order_id: order.id,
+        handler: async function(response) {
+          // 4. Save donation to MongoDB
+          const saveRes = await fetch('/api/donors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              phone: phone || null,
+              email,
+              amount: donationAmount,
+              transactionId: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          });
 
-    } catch (err) {
-      setError(err.message || 'Something went wrong');
+          if (saveRes.ok) {
+            onDonationSubmitted();
+            // Reset form
+            setName('');
+            setEmail('');
+            setPhone('');
+            setAmount('');
+            setCustomAmount('');
+            alert('Thank you for your donation!');
+          }
+        },
+        prefill: {
+          name,
+          email,
+          contact: phone
+        },
+        theme: { color: '#1f2937' }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Payment failed. Please try again.');
+    } finally {
       setIsProcessing(false);
     }
   };
-
-  if (showVerification) {
-    return (
-      <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm sticky top-24 text-center">
-        <Loader className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-        <h3 className="text-xl font-medium text-gray-900 mb-2">Waiting for Payment</h3>
-        <p className="text-gray-600 mb-4">
-          Please complete the payment in your UPI app.
-        </p>
-        <p className="text-sm text-gray-400 mb-6">
-          Amount: ₹{(parseInt(amount || customAmount) || 0).toLocaleString('en-IN')}
-        </p>
-        <button
-          onClick={() => {
-            setShowVerification(false);
-            setIsProcessing(false);
-          }}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          Cancel
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm sticky top-24">
       <h2 className="text-2xl font-medium text-gray-900 mb-6">Make a Contribution</h2>
 
-      {success && (
-        <div className="mb-6 p-4 bg-green-50 text-green-800 rounded-xl flex items-center">
-          <CheckCircle className="w-5 h-5 mr-2" />
-          Donation recorded! It will appear after verification.
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl text-sm">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+      <form onSubmit={handlePayment} className="space-y-6">
         {/* Name Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Your Name <span className="text-red-500">*</span>
-            <span className="text-gray-400 ml-2">(will be shown publicly)</span>
           </label>
           <input
             type="text"
@@ -146,14 +126,26 @@ export default function DonationForm({ onDonationSubmitted, upiId, businessName 
           />
         </div>
 
-        {/* Phone Number Input (Optional) */}
+        {/* Email Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-400"
+          />
+        </div>
+
+        {/* Phone Input (Optional) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Phone Number <span className="text-gray-400">(optional)</span>
           </label>
-          <p className="text-xs text-gray-400 mb-2">
-            Your phone number will remain private. Only used to appreciate you in my good time.
-          </p>
           <input
             type="tel"
             value={phone}
@@ -184,41 +176,23 @@ export default function DonationForm({ onDonationSubmitted, upiId, businessName 
               </button>
             ))}
           </div>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
-            <input
-              type="number"
-              placeholder="Custom amount"
-              value={customAmount}
-              onChange={handleCustomAmount}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-400"
-            />
-          </div>
+          <input
+            type="number"
+            placeholder="Custom amount"
+            value={customAmount}
+            onChange={(e) => setCustomAmount(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-400"
+          />
         </div>
 
-        {/* Pay Now Button */}
+        {/* Submit Button */}
         <button
-          type="button"
-          onClick={handlePayNow}
-          disabled={isProcessing || !name || (!amount && !customAmount)}
-          className="w-full py-4 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          type="submit"
+          disabled={isProcessing || !name || !email || (!amount && !customAmount)}
+          className="w-full py-4 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400"
         >
-          {isProcessing ? (
-            <>
-              <Loader className="w-5 h-5 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Smartphone className="w-5 h-5" />
-              Pay ₹{(parseInt(amount || customAmount) || 0).toLocaleString('en-IN')} via UPI
-            </>
-          )}
+          {isProcessing ? 'Processing...' : 'Donate with UPI / Cards'}
         </button>
-
-        <p className="text-xs text-gray-400 text-center">
-          Click to pay with Google Pay, PhonePe, or any UPI app. Your name will appear automatically after payment.
-        </p>
       </form>
     </div>
   );

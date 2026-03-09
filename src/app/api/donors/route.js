@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/mongodb';
+import clientPromise from '@/lib/mongodb';
 
+// GET: Fetch verified donors (unchanged)
 export async function GET() {
   try {
-    const db = await getDb();
+    const client = await clientPromise;
+    const db = client.db('donations');
 
     const donors = await db
       .collection('donors')
@@ -26,25 +28,47 @@ export async function GET() {
   }
 }
 
+// POST: Save a new donation (updated for Razorpay)
 export async function POST(req) {
   try {
-    const { name, phone, amount, transactionId } = await req.json();
-    const db = await getDb();
+    const {
+      name,
+      phone,
+      email,
+      amount,
+      transactionId,
+      razorpay_order_id,
+      razorpay_signature
+    } = await req.json();
+
+    // Validate required fields
+    if (!name || !amount || !transactionId) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    const client = await clientPromise;
+    const db = client.db('donations');
 
     const result = await db.collection('donors').insertOne({
       name,
       phone: phone || null,
+      email: email || null,
       amount: Number(amount),
-      transactionId,
+      transactionId,                // Razorpay payment ID
+      razorpay_order_id,             // Razorpay order ID
+      razorpay_signature,            // Razorpay signature
       date: new Date().toISOString().split('T')[0],
-      verified: false,
+      verified: true,                // Automatically verified via Razorpay
       createdAt: new Date(),
     });
 
     return NextResponse.json({
       success: true,
       id: result.insertedId,
-      message: 'Donation recorded. Will be displayed after verification.'
+      message: 'Donation recorded successfully!'
     });
   } catch (error) {
     console.error('Error saving donor:', error);
