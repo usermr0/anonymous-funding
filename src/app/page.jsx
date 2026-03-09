@@ -123,7 +123,7 @@ export default function HomePage() {
           >
             <DonationForm
               onDonationSubmitted={handleDonationSubmitted}
-              upiId="mrzerofund@ybl"
+              upiId="shubhamvx@ybl"
               businessName="Help Fund"
             />
           </motion.div>
